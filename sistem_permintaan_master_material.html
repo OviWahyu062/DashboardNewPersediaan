@@ -1,0 +1,2376 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Permintaan Master Material & Approval</title>
+    <!-- Chosen Palette: Pelindo Corporate Blue & Warm Slate -->
+    <!-- Application Structure Plan: SPA dashboard layout for managing SAP material master requests. Divided into three key sections: 1. Executive Dashboard (KPI metrics & Chart.js visual overview), 2. Dynamic Material Request Form with multi-item tab support & Request History table displaying each requested line item individually, 3. Approval Workspace with role-based action buttons (L1/L2) and custom table views per role. Rationale: Facilitates swift navigation, structured multi-item SAP requests, tailored views for Admin Peralatan (L1) and Manper (L2), and seamless workflow verification. -->
+    <!-- Visualization & Content Choices: 1. Status Breakdown -> Doughnut Chart (Chart.js) -> Quick visual status distribution. 2. Area Distribution -> Bar Chart (Chart.js) -> Compare demand across 4 Areas. 3. TKDN Sebaran -> Pie Chart (Chart.js) -> Track local content compliance percentages. Dynamic HTML tables + Modals handle granular details and approval workflows without page reloads. Confirming NO SVG / Mermaid JS used. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        },
+                        pelindo: {
+                            blue: '#00529C',
+                            darkBlue: '#003366',
+                            lightBlue: '#E6F0FA',
+                            orange: '#F37021'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --pelindo-navy: #082f57;
+            --pelindo-blue: #00529c;
+            --pelindo-sky: #0b75c9;
+            --pelindo-orange: #f37021;
+            --surface: rgba(255, 255, 255, 0.96);
+            --line: #dfe8f1;
+            --ink: #132238;
+            --muted: #64748b;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background:
+                radial-gradient(circle at 8% 0%, rgba(0, 82, 156, 0.08), transparent 30rem),
+                linear-gradient(180deg, #f7faff 0%, #f3f7fb 48%, #f8fafc 100%);
+            color: var(--ink);
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0 0 auto 0;
+            height: 3px;
+            z-index: 60;
+            background: linear-gradient(90deg, var(--pelindo-navy), var(--pelindo-blue) 52%, var(--pelindo-orange));
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.9) !important;
+            border-color: rgba(203, 213, 225, 0.72) !important;
+            box-shadow: 0 10px 32px rgba(8, 47, 87, 0.07) !important;
+            backdrop-filter: blur(18px);
+        }
+
+        header .w-10.h-10 {
+            background: linear-gradient(145deg, var(--pelindo-sky), var(--pelindo-navy)) !important;
+            border-radius: 14px !important;
+            box-shadow: 0 8px 18px rgba(0, 82, 156, 0.22) !important;
+        }
+
+        header h1 {
+            color: var(--pelindo-navy) !important;
+            letter-spacing: -0.03em !important;
+        }
+
+        header .border-t {
+            border-top-color: #edf2f7 !important;
+            gap: 0.35rem;
+        }
+
+        .tab-btn {
+            position: relative;
+            margin-top: 0.45rem;
+            padding: 0.68rem 0.85rem !important;
+            border: 0 !important;
+            border-radius: 0.75rem 0.75rem 0 0;
+        }
+
+        .tab-btn:hover {
+            background: #f1f6fb;
+            color: var(--pelindo-navy) !important;
+        }
+
+        .tab-btn.active {
+            color: var(--pelindo-blue);
+            font-weight: 700;
+            background: linear-gradient(180deg, #edf6ff 0%, rgba(237, 246, 255, 0) 100%);
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            height: 3px;
+            left: 0.85rem;
+            right: 0.85rem;
+            bottom: 0;
+            border-radius: 999px 999px 0 0;
+            background: linear-gradient(90deg, var(--pelindo-blue), #2b8fd4);
+        }
+
+        main {
+            max-width: 88rem !important;
+            padding-top: 1.75rem !important;
+            padding-bottom: 3rem !important;
+        }
+
+        section > p:first-child {
+            position: relative;
+            overflow: hidden;
+            color: #496178 !important;
+            background: linear-gradient(90deg, rgba(235, 246, 255, 0.92), rgba(255, 255, 255, 0.92)) !important;
+            border: 1px solid #d9eafb !important;
+            border-left: 4px solid var(--pelindo-blue) !important;
+            border-radius: 0.9rem !important;
+            padding: 0.9rem 1rem !important;
+            box-shadow: 0 8px 24px rgba(8, 47, 87, 0.04);
+        }
+
+        #tabContentDashboard > .grid:first-of-type > div {
+            position: relative;
+            isolation: isolate;
+            overflow: hidden;
+            min-height: 8.8rem;
+            padding: 1.3rem !important;
+            border: 1px solid rgba(214, 225, 236, 0.9) !important;
+            border-radius: 1rem !important;
+            background: var(--surface) !important;
+            box-shadow: 0 10px 26px rgba(8, 47, 87, 0.065) !important;
+            transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease !important;
+        }
+
+        #tabContentDashboard > .grid:first-of-type > div::before {
+            content: '';
+            position: absolute;
+            z-index: -1;
+            width: 7rem;
+            height: 7rem;
+            right: -2.2rem;
+            top: -3.25rem;
+            border-radius: 999px;
+            background: rgba(0, 82, 156, 0.055);
+        }
+
+        #tabContentDashboard > .grid:first-of-type > div:nth-child(2)::before {
+            background: rgba(245, 158, 11, 0.075);
+        }
+
+        #tabContentDashboard > .grid:first-of-type > div:nth-child(3)::before {
+            background: rgba(16, 185, 129, 0.075);
+        }
+
+        #tabContentDashboard > .grid:first-of-type > div:nth-child(4)::before {
+            background: rgba(99, 102, 241, 0.07);
+        }
+
+        #tabContentDashboard > .grid:first-of-type > div:hover {
+            transform: translateY(-2px);
+            border-color: #bdd5e9 !important;
+            box-shadow: 0 16px 34px rgba(8, 47, 87, 0.1) !important;
+        }
+
+        #tabContentDashboard > .grid:first-of-type .w-12.h-12 {
+            width: 2.75rem !important;
+            height: 2.75rem !important;
+            border-radius: 0.85rem !important;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+        }
+
+        #tabContentDashboard > .grid:first-of-type h3 {
+            letter-spacing: -0.045em;
+        }
+
+        #tabContentDashboard > .grid:nth-of-type(2) > div,
+        .bg-white.rounded-2xl.border.border-slate-200.shadow-sm {
+            border-color: rgba(214, 225, 236, 0.92) !important;
+            border-radius: 1rem !important;
+            background: var(--surface) !important;
+            box-shadow: 0 10px 28px rgba(8, 47, 87, 0.06) !important;
+        }
+
+        #tabContentDashboard > .grid:nth-of-type(2) > div {
+            padding: 1.25rem !important;
+        }
+
+        #tabContentDashboard > .grid:nth-of-type(2) h3 {
+            margin-bottom: 0.9rem !important;
+            padding-bottom: 0.8rem;
+            border-bottom: 1px solid #edf2f7;
+        }
+
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        thead {
+            background: #f2f6fa !important;
+            color: #52677c !important;
+        }
+
+        thead th {
+            padding-top: 0.85rem !important;
+            padding-bottom: 0.85rem !important;
+            letter-spacing: 0.045em;
+        }
+
+        tbody tr {
+            transition: background-color 150ms ease, box-shadow 150ms ease !important;
+        }
+
+        tbody tr:hover {
+            background: #f7fbff !important;
+            box-shadow: inset 3px 0 0 var(--pelindo-blue);
+        }
+
+        input:not([type='file']), select, textarea {
+            min-height: 2.65rem;
+            border-color: #cfdbe7 !important;
+            background-color: #fff;
+            box-shadow: 0 1px 2px rgba(8, 47, 87, 0.025);
+        }
+
+        input:not([type='file']):focus, select:focus, textarea:focus {
+            border-color: var(--pelindo-blue) !important;
+            box-shadow: 0 0 0 3px rgba(0, 82, 156, 0.11) !important;
+        }
+
+        label {
+            color: #3d5369 !important;
+        }
+
+        button {
+            letter-spacing: -0.01em;
+        }
+
+        button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+            outline: 3px solid rgba(11, 117, 201, 0.28);
+            outline-offset: 2px;
+        }
+
+        #approvalRoleTitle {
+            letter-spacing: -0.025em;
+        }
+
+        #tabContentApproval > div:nth-of-type(1) {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(120deg, var(--pelindo-navy), var(--pelindo-blue) 72%, #0b75c9) !important;
+            box-shadow: 0 16px 32px rgba(8, 47, 87, 0.18) !important;
+        }
+
+        #tabContentApproval > div:nth-of-type(1)::after {
+            content: '';
+            position: absolute;
+            width: 12rem;
+            height: 12rem;
+            right: -4rem;
+            top: -7rem;
+            border-radius: 999px;
+            border: 2rem solid rgba(255, 255, 255, 0.06);
+            pointer-events: none;
+        }
+
+        [id$='Modal'] > div {
+            border-radius: 1.1rem !important;
+            box-shadow: 0 28px 72px rgba(8, 29, 54, 0.25) !important;
+        }
+
+        .custom-scrollbar {
+            scrollbar-color: #a9bed1 transparent;
+            scrollbar-width: thin;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        @media (max-width: 640px) {
+            header .h-16 {
+                height: 4.25rem !important;
+            }
+
+            .tab-btn {
+                padding-inline: 0.65rem !important;
+            }
+
+            main {
+                padding-top: 1rem !important;
+            }
+
+            #tabContentDashboard > .grid:first-of-type > div {
+                min-height: auto;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+            }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col justify-between">
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-pelindo-blue flex items-center justify-center text-white font-bold text-xl shadow-md">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">
+                            Sistem Master Material
+                        </h1>
+                        <p class="text-xs text-slate-500 font-medium hidden sm:block">Permintaan & Workflow Approval Master Data SAP</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2 sm:space-x-4">
+                    <div class="bg-slate-100 p-1 rounded-xl flex items-center border border-slate-200 text-xs sm:text-sm">
+                        <span class="text-slate-500 px-2 font-medium hidden md:inline"><i class="fa-solid fa-user-shield mr-1"></i> Peran:</span>
+                        <select id="roleSelector" onchange="changeRole(this.value)" class="bg-white border-0 font-semibold text-slate-700 rounded-lg px-2 py-1 shadow-sm focus:ring-2 focus:ring-pelindo-blue cursor-pointer outline-none">
+                            <option value="pemohon">Pemohon (User)</option>
+                            <option value="approver1">Approver L1 (Admin Peralatan Area)</option>
+                            <option value="approver2" selected>Approver L2 (Manper Area)</option>
+                            <option value="approver3">Approval L3 (Manager Akuntansi)</option>
+                            <option value="approver4">Approval L4 (Manager Persediaan)</option>
+                        </select>
+                    </div>
+
+                    <button onclick="toggleModal('gsheetModal')" class="p-2 text-slate-600 hover:text-pelindo-blue hover:bg-slate-100 rounded-xl transition" title="Konfigurasi Integrasi Google Sheets">
+                        <i class="fa-solid fa-file-excel text-lg text-emerald-600"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex space-x-8 border-t border-slate-100 -mb-px overflow-x-auto custom-scrollbar">
+                <button id="tabBtnDashboard" onclick="switchTab('dashboard')" class="tab-btn active py-3 px-1 border-b-2 border-transparent text-sm font-medium text-slate-500 hover:text-slate-700 whitespace-nowrap transition flex items-center space-x-2">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Dashboard Metrics</span>
+                </button>
+                <button id="tabBtnPermohonan" onclick="switchTab('permohonan')" class="tab-btn py-3 px-1 border-b-2 border-transparent text-sm font-medium text-slate-500 hover:text-slate-700 whitespace-nowrap transition flex items-center space-x-2">
+                    <i class="fa-solid fa-file-signature"></i>
+                    <span>Form Permintaan Material</span>
+                </button>
+                <button id="tabBtnApproval" onclick="switchTab('approval')" class="tab-btn py-3 px-1 border-b-2 border-transparent text-sm font-medium text-slate-500 hover:text-slate-700 whitespace-nowrap transition flex items-center space-x-2 relative">
+                    <i class="fa-solid fa-clipboard-check"></i>
+                    <span>Approval Workspace</span>
+                    <span id="pendingBadge" class="ml-1.5 px-2 py-0.5 text-xs bg-amber-500 text-white font-bold rounded-full hidden">0</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+
+        <section id="tabContentDashboard" class="space-y-6">
+            <p class="text-xs text-slate-500 bg-blue-50/50 p-3 rounded-xl border border-blue-100/60 leading-relaxed">
+                Modul Dashboard memberikan ringkasan status permohonan master material SAP secara real-time. Anda dapat memantau jumlah pengajuan, progres persetujuan bertingkat (L1 s.d. L4), serta rata-rata pencapaian Tingkat Komponen Dalam Negeri (TKDN) di seluruh wilayah operasional.
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Permintaan</p>
+                            <h3 id="statTotal" class="text-2xl sm:text-3xl font-extrabold text-slate-800 mt-1">0</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-blue-50 text-pelindo-blue rounded-xl flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-folder-open"></i>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2"><i class="fa-solid fa-clock text-blue-500"></i> Akumulasi seluruh pengajuan</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Approval</p>
+                            <h3 id="statPending" class="text-2xl sm:text-3xl font-extrabold text-amber-600 mt-1">0</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-hourglass-half"></i>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2"><i class="fa-solid fa-circle-notch animate-spin text-amber-500"></i> Menunggu review L1 s.d. L4</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Disetujui (Approved)</p>
+                            <h3 id="statApproved" class="text-2xl sm:text-3xl font-extrabold text-emerald-600 mt-1">0</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2"><i class="fa-solid fa-check text-emerald-500"></i> Siap dibuatkan Kode Master SAP</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Rata-rata TKDN</p>
+                            <h3 id="statTkdnAvg" class="text-2xl sm:text-3xl font-extrabold text-indigo-600 mt-1">0%</h3>
+                        </div>
+                        <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-percent"></i>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2"><i class="fa-solid fa-chart-line text-indigo-500"></i> Capaian Tingkat Komponen Dalam Negeri</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center space-x-2">
+                        <i class="fa-solid fa-chart-pie text-pelindo-blue"></i>
+                        <span>Status Permintaan</span>
+                    </h3>
+                    <div class="relative w-full max-w-md mx-auto h-64 flex items-center justify-center">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center space-x-2">
+                        <i class="fa-solid fa-chart-bar text-pelindo-orange"></i>
+                        <span>Permintaan per Area</span>
+                    </h3>
+                    <div class="relative w-full max-w-md mx-auto h-64">
+                        <canvas id="plantChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center space-x-2">
+                        <i class="fa-solid fa-gauge-high text-emerald-600"></i>
+                        <span>Sebaran Kategori TKDN</span>
+                    </h3>
+                    <div class="relative w-full max-w-md mx-auto h-64 flex items-center justify-center">
+                        <canvas id="tkdnChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800">Aktivitas Terkini</h3>
+                        <p class="text-xs text-slate-500">Daftar permintaan master material yang paling baru diajukan</p>
+                    </div>
+                    <button onclick="switchTab('permohonan')" class="text-xs font-semibold text-pelindo-blue hover:text-pelindo-darkBlue flex items-center space-x-1">
+                        <span>Lihat Semua Permintaan</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs sm:text-sm text-slate-600">
+                        <thead class="bg-slate-50 text-slate-500 font-semibold uppercase text-xs border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3">ID Req</th>
+                                <th class="px-4 py-3">Tanggal</th>
+                                <th class="px-4 py-3">Pemohon</th>
+                                <th class="px-4 py-3">Area & Site</th>
+                                <th class="px-4 py-3">Nama Barang</th>
+                                <th class="px-4 py-3">Material Type</th>
+                                <th class="px-4 py-3 text-center">Status</th>
+                                <th class="px-4 py-3 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashboardTableBody" class="divide-y divide-slate-100">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="tabContentPermohonan" class="hidden space-y-6">
+            <p class="text-xs text-slate-500 bg-blue-50/50 p-3 rounded-xl border border-blue-100/60 leading-relaxed">
+                Modul Form Permintaan digunakan oleh pemohon untuk merinci atribut master material SAP. Pengajuan mendukung pembuatan beberapa item barang sekaligus (multi-item) dalam satu ID Request. Gunakan tabel di bagian bawah untuk mencari riwayat atau mengekspor data ke format CSV.
+            </p>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <div class="border-b border-slate-100 pb-4 mb-6 flex justify-between items-center flex-wrap gap-2">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                            <i class="fa-solid fa-square-plus text-pelindo-blue"></i>
+                            <span>Form Pengajuan Master Material Baru</span>
+                        </h2>
+                        <p class="text-xs text-slate-500">Lengkapi atribut data master material sesuai standar SAP perusahaan</p>
+                    </div>
+                    <span class="text-xs bg-blue-50 text-pelindo-blue px-3 py-1 rounded-full font-semibold border border-blue-100">
+                        * Wajib Diisi
+                    </span>
+                </div>
+
+                <form id="materialForm" onsubmit="handleFormSubmit(event)" class="space-y-6">
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center space-x-1">
+                            <i class="fa-solid fa-user-tag"></i>
+                            <span>1. Informasi Pemohon & Lokasi Kerja (Satu ID Request)</span>
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Pemohon <span class="text-red-500">*</span></label>
+                                <input type="text" id="namaPemohon" required class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition" placeholder="Masukkan nama pemohon">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Tanggal Pengajuan <span class="text-red-500">*</span></label>
+                                <input type="date" id="tanggal" required class="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-slate-50 text-slate-600 focus:ring-2 focus:ring-pelindo-blue outline-none cursor-not-allowed" readonly>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Area <span class="text-red-500">*</span></label>
+                                <select id="area" required onchange="handleAreaChange(this.value)" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition bg-white">
+                                    <option value="" disabled selected>-- Pilih Area --</option>
+                                    <option value="Area 1">Area 1</option>
+                                    <option value="Area 2">Area 2</option>
+                                    <option value="Area 3">Area 3</option>
+                                    <option value="Area 4">Area 4</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Site <span class="text-red-500">*</span></label>
+                                <select id="site" required onchange="handleSiteChange(this.value)" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition bg-white">
+                                    <option value="" disabled selected>-- Pilih Area terlebih dahulu --</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-b border-slate-200 py-4 my-4 bg-slate-50 p-4 rounded-2xl">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center space-x-1">
+                                    <i class="fa-solid fa-layer-group text-pelindo-blue"></i>
+                                    <span>Daftar Item Material Dalam 1 Request</span>
+                                </h3>
+                                <p class="text-[11px] text-slate-500">Anda dapat menambahkan beberapa item barang sekaligus dalam 1 nomor ID Request yang sama.</p>
+                            </div>
+                            <button type="button" onclick="addMaterialItemTab()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition flex items-center space-x-1 shadow-sm">
+                                <i class="fa-solid fa-circle-plus"></i>
+                                <span>+ Tambah Item Material</span>
+                            </button>
+                        </div>
+
+                        <div id="materialTabsNav" class="flex items-center space-x-2 overflow-x-auto pb-1 custom-scrollbar">
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center space-x-1">
+                            <i class="fa-solid fa-box-archive"></i>
+                            <span>2. Spesifikasi Atribut Material (<span id="activeItemLabel">Item #1</span>)</span>
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Barang / Deskripsi Material <span class="text-red-500">*</span></label>
+                                <input type="text" id="namaBarang" required oninput="syncActiveItemField('namaBarang', this.value)" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition" placeholder="Contoh: BEARING BALL 6205-2RS C3">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Merk / Brand <span class="text-red-500">*</span></label>
+                                <input type="text" id="merk" required oninput="syncActiveItemField('merk', this.value)" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition" placeholder="Contoh: SKF, Schneider, CAT">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Part Number <span class="text-red-500">*</span></label>
+                                <input type="text" id="partNumber" required oninput="syncActiveItemField('partNumber', this.value)" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition" placeholder="Contoh: 6205-2RS-C3">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Material Type <span class="text-red-500">*</span></label>
+                                <select id="materialType" required onchange="syncActiveItemField('materialType', this.value)" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition bg-white">
+                                    <option value="" disabled selected>-- Pilih Material Type --</option>
+                                    <option value="1011 Spare Parts Teknik">1011 Spare Parts Teknik</option>
+                                    <option value="1012 BBM, Pelumas, Grease">1012 BBM, Pelumas, Grease</option>
+                                    <option value="1013 Peralatan Perlengkap Ktr">1013 Peralatan Perlengkap Ktr</option>
+                                    <option value="1014 Teknologi Informasi">1014 Teknologi Informasi</option>
+                                    <option value="1015 Maintenance assemblies">1015 Maintenance assemblies</option>
+                                    <option value="1016 Aneka Usaha">1016 Aneka Usaha</option>
+                                    <option value="1017 Asset">1017 Asset</option>
+                                    <option value="1018 Sparepart Mechanical">1018 Sparepart Mechanical</option>
+                                    <option value="1019 Sparepart Electrical">1019 Sparepart Electrical</option>
+                                    <option value="1020 Consumable Part Filter">1020 Consumable Part Filter</option>
+                                    <option value="1021 Sparepart Unit">1021 Sparepart Unit</option>
+                                    <option value="1022 Sparepart Lubrication&Chm">1022 Sparepart Lubrication&Chm</option>
+                                    <option value="1023 Consumable Part Mechanica">1023 Consumable Part Mechanica</option>
+                                    <option value="1024 Tools Mechanical">1024 Tools Mechanical</option>
+                                    <option value="1025 Tools Tools">1025 Tools Tools</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Material Group <span class="text-red-500">*</span></label>
+                                <select id="materialGroup" required onchange="syncActiveItemField('materialGroup', this.value)" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition bg-white">
+                                    <option value="" disabled selected>-- Pilih Material Group --</option>
+                                    <option value="98-100 Fuel">98-100 Fuel</option>
+                                    <option value="98-101 Oil">98-101 Oil</option>
+                                    <option value="98-102 Grease">98-102 Grease</option>
+                                    <option value="98-103 Paint">98-103 Paint</option>
+                                    <option value="98-104 Chemical">98-104 Chemical</option>
+                                    <option value="99-100 Wirerope">99-100 Wirerope</option>
+                                    <option value="99-101 Tyre">99-101 Tyre</option>
+                                    <option value="99-102 Bolt,Nut,Washer,Klem">99-102 Bolt,Nut,Washer,Klem</option>
+                                    <option value="99-103 Gasket,Seal,Packing">99-103 Gasket,Seal,Packing</option>
+                                    <option value="99-104 Fbrictn,Repair,Calbr">99-104 Fbrictn,Repair,Calbr</option>
+                                    <option value="99-105 Gear Box,Sprocket">99-105 Gear Box,Sprocket</option>
+                                    <option value="99-106 Hose,Pipe">99-106 Hose,Pipe</option>
+                                    <option value="99-107 Pump, Compressor">99-107 Pump, Compressor</option>
+                                    <option value="99-108 Radiator">99-108 Radiator</option>
+                                    <option value="99-109 Valve">99-109 Valve</option>
+                                    <option value="99-110 Brake">99-110 Brake</option>
+                                    <option value="99-111 Bearing,Roller">99-111 Bearing,Roller</option>
+                                    <option value="99-112 Belt,Chain">99-112 Belt,Chain</option>
+                                    <option value="99-113 Pad,Rubber">99-113 Pad,Rubber</option>
+                                    <option value="99-114 Overhaul Engine">99-114 Overhaul Engine</option>
+                                    <option value="99-115 Spring">99-115 Spring</option>
+                                    <option value="99-116 Tools">99-116 Tools</option>
+                                    <option value="99-117 Pull,Shft,Trsms,Bush">99-117 Pull,Shft,Trsms,Bush</option>
+                                    <option value="99-118 Twitslock,Pin">99-118 Twitslock,Pin</option>
+                                    <option value="99-119 Spreader">99-119 Spreader</option>
+                                    <option value="99-120 Card,Drive,PLC">99-120 Card,Drive,PLC</option>
+                                    <option value="99-121 Cpsitor,IGBT,Resstor">99-121 Cpsitor,IGBT,Resstor</option>
+                                    <option value="99-122 Relay,Contctor,Timer">99-122 Relay,Contctor,Timer</option>
+                                    <option value="99-123 Generator,Motor">99-123 Generator,Motor</option>
+                                    <option value="99-124 Sign Dev,Speakr,Horn">99-124 Sign Dev,Speakr,Horn</option>
+                                    <option value="99-125 Cable">99-125 Cable</option>
+                                    <option value="99-126 Inductor,Reactor">99-126 Inductor,Reactor</option>
+                                    <option value="99-127 Measure/Testing Eq.">99-127 Measure/Testing Eq.</option>
+                                    <option value="99-128 MCB,Fuse,Protect Dev">99-128 MCB,Fuse,Protect Dev</option>
+                                    <option value="99-129 Power Supply">99-129 Power Supply</option>
+                                    <option value="99-130 Sensor,Switch,Button">99-130 Sensor,Switch,Button</option>
+                                    <option value="99-131 Trnsfrmer, Air Cond">99-131 Trnsfrmer, Air Cond</option>
+                                    <option value="99-132 Mdltr,Chrgr,Mntr,Cam">99-132 Mdltr,Chrgr,Mntr,Cam</option>
+                                    <option value="99-133 Pwr Line,Busbr,Anten">99-133 Pwr Line,Busbr,Anten</option>
+                                    <option value="99-134 Battery">99-134 Battery</option>
+                                    <option value="99-135 Brush">99-135 Brush</option>
+                                    <option value="99-136 Tools">99-136 Tools</option>
+                                    <option value="99-137 Rewnding,Repair,Fbrc">99-137 Rewnding,Repair,Fbrc</option>
+                                    <option value="99-138 Fuel Filter">99-138 Fuel Filter</option>
+                                    <option value="99-139 Water Filter">99-139 Water Filter</option>
+                                    <option value="99-140 Air Filter">99-140 Air Filter</option>
+                                    <option value="99-141 Oil Filter">99-141 Oil Filter</option>
+                                    <option value="99-142 Spreader">99-142 Spreader</option>
+                                    <option value="99-143 RTG">99-143 RTG</option>
+                                    <option value="99-144 Navigasi">99-144 Navigasi</option>
+                                    <option value="99-145 Komunikasi">99-145 Komunikasi</option>
+                                    <option value="99-146 Hopper">99-146 Hopper</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">UOM (Unit of Measure) <span class="text-red-500">*</span></label>
+                                <select id="uom" required onchange="syncActiveItemField('uom', this.value)" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition bg-white">
+                                    <option value="" disabled selected>-- Pilih UOM --</option>
+                                    <option value="BKS">BKS</option>
+                                    <option value="BOT">BOT</option>
+                                    <option value="BOX">BOX</option>
+                                    <option value="BTG">BTG</option>
+                                    <option value="CM">CM</option>
+                                    <option value="DR">DR</option>
+                                    <option value="EA">EA</option>
+                                    <option value="GAL">GAL</option>
+                                    <option value="KAL">KAL</option>
+                                    <option value="KG">KG</option>
+                                    <option value="L">L</option>
+                                    <option value="Lbr">Lbr</option>
+                                    <option value="LMP">LMP</option>
+                                    <option value="LOT">LOT</option>
+                                    <option value="M">M</option>
+                                    <option value="M2">M2</option>
+                                    <option value="M3">M3</option>
+                                    <option value="ML">ML</option>
+                                    <option value="PC">PC</option>
+                                    <option value="RLL">RLL</option>
+                                    <option value="SET">SET</option>
+                                    <option value="TO">TO</option>
+                                    <option value="UN">UN</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center space-x-1">
+                            <i class="fa-solid fa-calculator"></i>
+                            <span>3. Atribut SAP & Keuangan</span>
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Kode Plant <span class="text-red-500">*</span></label>
+                                <input type="text" id="kodePlant" required readonly class="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-slate-100 text-slate-600 font-mono font-bold cursor-not-allowed" placeholder="Otomatis dari Site">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Profit Center <span class="text-red-500">*</span></label>
+                                <select id="profitCenter" required onchange="syncActiveItemField('profitCenter', this.value)" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition bg-white">
+                                    <option value="" disabled selected>-- Pilih Area terlebih dahulu --</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Storage Location <span class="text-red-500">*</span></label>
+                                <select id="storageLocation" required onchange="syncActiveItemField('storageLocation', this.value)" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition bg-white">
+                                    <option value="0001" selected>0001</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Valuation Class <span class="text-red-500">*</span></label>
+                                <select id="valuationClass" required onchange="syncActiveItemField('valuationClass', this.value)" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition bg-white">
+                                    <option value="" disabled selected>-- Pilih Valuation Class --</option>
+                                    <option value="1103 Suku Cadang Alat Faspel">1103 Suku Cadang Alat Faspel</option>
+                                    <option value="1102 Suku Cadang Inst. Faspel">1102 Suku Cadang Inst. Faspel</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center space-x-1">
+                            <i class="fa-solid fa-paperclip"></i>
+                            <span>4. Lampiran Dokumentasi (Opsional / Tidak Mandatori)</span>
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">TKDN % (Jika ada)</label>
+                                <div class="relative">
+                                    <input type="number" step="0.1" min="0" max="100" id="tkdn" oninput="syncActiveItemField('tkdn', this.value)" class="w-full text-xs p-2.5 pr-8 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition" placeholder="Contoh: 42.5">
+                                    <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-bold">%</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">URL Dokumentasi / Link Manual (Jika ada)</label>
+                                <input type="url" id="dokumentasiUrl" oninput="syncActiveItemField('dokumentasiUrl', this.value)" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue focus:border-pelindo-blue outline-none transition" placeholder="https://drive.google.com/file/d/...">
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Upload Gambar / Foto Fisik Barang (Opsional)</label>
+                                <div class="flex items-center space-x-4">
+                                    <input type="file" id="dokGambarInput" accept="image/*" onchange="handleImageUpload(event)" class="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-pelindo-blue hover:file:bg-blue-100 cursor-pointer">
+                                    <div id="imagePreviewContainer" class="hidden flex items-center space-x-2">
+                                        <img id="imagePreview" src="" alt="Preview" class="w-12 h-12 object-cover rounded-lg border border-slate-200 shadow-sm">
+                                        <button type="button" onclick="removeUploadedImage()" class="text-xs text-red-500 hover:text-red-700 font-semibold"><i class="fa-solid fa-trash"></i> Hapus Gambar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-100 flex justify-end space-x-3">
+                        <button type="button" onclick="resetForm()" class="px-5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
+                            <i class="fa-solid fa-rotate-left mr-1"></i> Reset Form
+                        </button>
+                        <button type="submit" class="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-pelindo-blue hover:bg-pelindo-darkBlue transition shadow-md flex items-center space-x-2">
+                            <i class="fa-solid fa-paper-plane"></i>
+                            <span>Kirim Permintaan Master Material (<span id="totalItemsSubmitBadge">1 Item</span>)</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800">Daftar Permohonan Master Material</h3>
+                        <p class="text-xs text-slate-500">Seluruh histori pengajuan data master material (per line item)</p>
+                    </div>
+                    <div class="flex items-center space-x-3 w-full sm:w-auto">
+                        <input type="text" id="searchInput" oninput="renderPermohonanTable()" placeholder="Cari ID, Pemohon, Barang, Site..." class="text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-pelindo-blue outline-none w-full sm:w-64">
+                        <button onclick="exportToCSV()" class="px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-xl text-xs font-bold transition flex items-center space-x-1 shrink-0">
+                            <i class="fa-solid fa-file-csv text-sm"></i>
+                            <span>Export CSV</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs sm:text-sm text-slate-600">
+                        <thead class="bg-slate-50 text-slate-500 font-semibold uppercase text-xs border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3">ID Req</th>
+                                <th class="px-4 py-3">Tanggal</th>
+                                <th class="px-4 py-3">Pemohon</th>
+                                <th class="px-4 py-3">Site</th>
+                                <th class="px-4 py-3">Nama Barang</th>
+                                <th class="px-4 py-3">Material Group</th>
+                                <th class="px-4 py-3">TKDN</th>
+                                <th class="px-4 py-3 text-center">Status</th>
+                                <th class="px-4 py-3 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="permohonanTableBody" class="divide-y divide-slate-100">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="tabContentApproval" class="hidden space-y-6">
+            <p class="text-xs text-slate-500 bg-blue-50/50 p-3 rounded-xl border border-blue-100/60 leading-relaxed">
+                Modul Approval Workspace difungsikan untuk verifikasi berjenjang mulai dari Admin Peralatan Area (L1), Manper Area (L2), Manager Akuntansi (L3), hingga Manager Persediaan (L4). Anda dapat meninjau detail item material, memberikan catatan verifikasi, serta menyetujui atau menolak permohonan.
+            </p>
+
+            <div class="bg-gradient-to-r from-pelindo-blue to-pelindo-darkBlue rounded-2xl p-6 text-white shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 id="approvalRoleTitle" class="text-lg font-bold">Modul Approval Manper Area (L2)</h2>
+                    <p id="approvalRoleDesc" class="text-xs text-blue-100 mt-1">Menampilkan permohonan yang telah disetujui L1 untuk verifikasi Manper Area (L2)</p>
+                </div>
+                <div class="flex items-center space-x-2 bg-white/10 p-1 rounded-xl text-xs">
+                    <button id="filterPendingBtn" onclick="setApprovalFilter('PENDING')" class="px-3 py-1.5 rounded-lg font-bold bg-white text-pelindo-blue shadow">Pending Review</button>
+                    <button id="filterHistoryBtn" onclick="setApprovalFilter('ALL')" class="px-3 py-1.5 rounded-lg font-bold text-white hover:bg-white/10">Semua / Riwayat</button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs sm:text-sm text-slate-600">
+                        <thead id="approvalTableHead" class="bg-slate-50 text-slate-500 font-semibold uppercase text-xs border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3">ID Req</th>
+                                <th class="px-4 py-3">Tanggal</th>
+                                <th class="px-4 py-3">Pemohon</th>
+                                <th class="px-4 py-3">Site (Plant)</th>
+                                <th class="px-4 py-3">Nama Barang</th>
+                                <th class="px-4 py-3">Profit Center</th>
+                                <th class="px-4 py-3 text-center">Status</th>
+                                <th class="px-4 py-3 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="approvalTableBody" class="divide-y divide-slate-100">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <div id="gsheetModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-file-excel text-emerald-600"></i>
+                    <span>Konfigurasi Integrasi Google Sheets</span>
+                </h3>
+                <button onclick="toggleModal('gsheetModal')" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <p class="text-slate-600 leading-relaxed">Masukkan URL Google Apps Script Web App untuk menyinkronkan pengajuan data secara otomatis dengan Google Sheets.</p>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">URL Web App Endpoint</label>
+                    <input type="url" id="gsheetUrlInput" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue outline-none" placeholder="https://script.google.com/macros/s/.../exec">
+                </div>
+                <p class="text-slate-400 text-[11px]">Jika dikosongkan, data otomatis disimpan pada memori browser lokal (LocalStorage).</p>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button onclick="toggleModal('gsheetModal')" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">Batal</button>
+                <button onclick="saveGSheetUrl()" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition">Simpan Konfigurasi</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="approvalModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-clipboard-check text-pelindo-blue"></i>
+                    <span id="approvalModalTitle">Verifikasi Approval Permintaan</span>
+                </h3>
+                <button onclick="toggleModal('approvalModal')" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 space-y-3">
+                    <div class="grid grid-cols-[92px_1fr] gap-2 items-start">
+                        <span class="text-slate-500">ID Request</span>
+                        <span id="approveModalReqId" class="font-bold text-pelindo-blue font-mono"></span>
+                    </div>
+                    <div class="grid grid-cols-[92px_1fr] gap-2 items-start">
+                        <span class="text-slate-500">Plant</span>
+                        <span id="approveModalPlant" class="font-semibold text-slate-800"></span>
+                    </div>
+                    <div class="grid grid-cols-[92px_1fr] gap-2 items-start">
+                        <span class="text-slate-500">Material</span>
+                        <span id="approveModalItem" class="font-semibold text-slate-800 leading-relaxed"></span>
+                    </div>
+                </div>
+                <div id="approvalL1ManualFields" class="space-y-3 hidden">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Jumlah Karakter Material</label>
+                        <input type="text" id="approvalMaterialCharacterCount" readonly class="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-slate-100 text-slate-700 outline-none font-mono font-bold cursor-not-allowed" aria-label="Jumlah karakter Material">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Rekomendasi Nama Material <span class="font-normal text-slate-400">(diisi manual)</span></label>
+                        <input type="text" id="approvalRecommendedName" maxlength="40" oninput="updateRecommendedNameCount()" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue outline-none" placeholder="Isi rekomendasi nama material secara manual">
+                        <p class="text-[11px] text-slate-400 text-right mt-1"><span id="approvalRecommendedNameCount">0</span>/40 karakter</p>
+                    </div>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Catatan <span class="text-red-500">*</span></label>
+                    <textarea id="approvalNotes" rows="3" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-pelindo-blue outline-none" placeholder="Masukkan catatan hasil verifikasi master data..."></textarea>
+                </div>
+            </div>
+            <div id="approvalL1Actions" class="hidden flex flex-wrap justify-end gap-2 pt-2 border-t border-slate-100">
+                <button onclick="processApproval('REJECTED')" class="px-4 py-2 rounded-xl text-xs font-bold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition flex items-center gap-1">
+                    <i class="fa-solid fa-xmark"></i> Reject
+                </button>
+                <button onclick="processApproval('APPROVED')" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition flex items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-check"></i> Setuju
+                </button>
+            </div>
+            <div id="approvalStandardActions" class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button onclick="processApproval('REJECTED')" class="px-4 py-2 rounded-xl text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 transition flex items-center gap-1">
+                    <i class="fa-solid fa-xmark"></i> Tolak (Reject)
+                </button>
+                <button onclick="processApproval('APPROVED')" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition flex items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-check"></i> Setujui (Approve)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="detailModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center shrink-0">
+                <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info text-pelindo-blue"></i>
+                    <span>Detail Permintaan Master Material - <span id="detailReqId" class="text-pelindo-blue font-mono"></span></span>
+                </h3>
+                <button onclick="toggleModal('detailModal')" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div id="detailModalContent" class="p-6 overflow-y-auto custom-scrollbar space-y-5 flex-grow text-xs">
+            </div>
+            <div class="p-4 border-t border-slate-100 flex justify-end shrink-0 bg-slate-50 rounded-b-2xl">
+                <button onclick="toggleModal('detailModal')" class="px-5 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 transition">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastNotificationModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 text-center space-y-3">
+            <div id="toastIconContainer" class="w-12 h-12 rounded-full mx-auto flex items-center justify-center text-xl bg-blue-50 text-pelindo-blue">
+                <i id="toastIcon" class="fa-solid fa-circle-info"></i>
+            </div>
+            <h4 id="toastTitle" class="text-base font-bold text-slate-800">Pemberitahuan</h4>
+            <p id="toastMessage" class="text-xs text-slate-600 leading-relaxed"></p>
+            <button onclick="toggleModal('toastNotificationModal')" class="w-full py-2 bg-pelindo-blue text-white rounded-xl font-bold text-xs hover:bg-pelindo-darkBlue transition">
+                Mengerti
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const sitesByArea = {
+            "Area 1": [
+                "5H01 - Site TPK Belawan Domestik",
+                "5H02 - Site TPK Perawang",
+                "5H03 - Site Pelabuhan Belawan",
+                "5H04 - Site Grha Pelindo",
+                "5H05 - Site BNCT",
+                "5H06 - Site Pelabuhan Kuala Tanjung",
+                "5H07 - Site Pelabuhan Belawan Pipa",
+                "5H08 - Site Pelabuhan Sibolga",
+                "5H10 - SITE PELABUHAN DUMAI"
+            ],
+            "Area 2": [
+                "5I01 - Site Pelabuhan Bengkulu",
+                "5I02 - Site Pelabuhan Cirebon",
+                "5I03 - Site Pelabuhan Jakarta 1",
+                "5I04 - Site Pelabuhan Banten",
+                "5I05 - Site Pelabuhan Panjang",
+                "5I06 - Site Pelabuhan Pontianak",
+                "5I07 - Site Pelabuhan Teluk Bayur",
+                "5I08 - Site Pelabuhan Palembang",
+                "5I09 - Site Pelabuhan Jambi",
+                "5I10 - Site Pelabuhan Pangkal Balam",
+                "5I11 - Site Pelabuhan Kijing",
+                "5I12 - Site Pelabuhan Jakarta 2",
+                "5I13 - Site Pelabuhan Jakarta 5",
+                "5I14 - Site Pelabuhan Aceh",
+                "5I15 - Task Force Regional 2",
+                "5I16 - Cabang Jakarta Area Ikt, Gs, Dan Ptp Tg Priok",
+                "5I17 - Cabang Jakarta Arei Mti",
+                "5I18 - Cabang Jakarta Area TPK 009",
+                "5I19 - Cabang Jakarta Area JICT"
+            ],
+            "Area 3": [
+                "5J02 - Site Perak",
+                "5J04 - Site Gresik",
+                "5J05 - Site Berlian",
+                "5J06 - Site Lamong",
+                "5J07 - Site TPKS",
+                "5J08 - Site Tanjung Emas",
+                "5J09 - Site Tanjung Intan",
+                "5J10 - Site Banjarmasin",
+                "5J12 - Site Batulicin",
+                "5J14 - Site Bagendang",
+                "5J16 - Site Bumiharjo",
+                "5J17 - Site Benoa",
+                "5J18 - Site Lembar",
+                "5J19 - Site Maumere",
+                "5J20 - Site Kupang",
+                "5J21 - Site Bima",
+                "5J22 - Site Celukan Bawang",
+                "5J23 - Site TPS",
+                "5J24 - Site Ende",
+                "5J25 - Site Badas",
+                "5J26 - Site BMC",
+                "5J27 - Site Waingapu",
+                "5J28 - Site Labuan Bajo",
+                "5J29 - Site Terminal Telang Baru",
+                "5J30 - Site Freeport"
+            ],
+            "Area 4": [
+                "5K01 - Site Pelabuhan Makassar",
+                "5K02 - Site Pelabuhan Pantoloan",
+                "5K03 - Site Pelabuhan Ternate",
+                "5K04 - Site Terminal Petikemas Bitung",
+                "5K05 - Site Makassar New Port",
+                "5K06 - Site Terminal Petikemas Makassar",
+                "5K07 - Site Pelabuhan Sorong",
+                "5K08 - Site Terminal Petikemas Ambon",
+                "5K09 - Site Kaltim Kariangau Terminal",
+                "5K10 - Site Terminal Petikemas Jayapura",
+                "5K11 - Site Pelabuhan Kendari",
+                "5K12 - Site Pelabuhan Merauke",
+                "5K13 - Site Pelabuhan Tarakan",
+                "5K14 - Site Pelabuhan Gorontalo",
+                "5K15 - Site Pelabuhan Manokwari",
+                "5K16 - Site Pelabuhan Semayang Balikpapan",
+                "5K17 - Site Pelabuhan Bontang",
+                "5K18 - BIMA Site Pelabuhan Biak",
+                "5K19 - BIMA Site Nunukan",
+                "5K20 - BIMA Site Toli-toli",
+                "5K21 - BIMA Site Fak-Fak"
+            ]
+        };
+
+        const profitCentersByArea = {
+            "Area 1": [
+                "53100 - Area 1",
+                "53101 - Site TPK Belawan Domestik",
+                "53102 - Site TPK Perawang",
+                "53103 - Site Pelabuhan Belawan",
+                "53104 - Site Graha Pelindo",
+                "53105 - Site Belawan New Container Terminal",
+                "53106 - Site Pelabuhan Kuala Tanjung",
+                "53107 - Site Pelabuhan Belawan Pipa",
+                "53108 - Site Pelabuhan Sibolga",
+                "53110 - Site Pelabuhan Dumai",
+                "53111 - Tanjung Pinang Area 1",
+                "53112 - Malahayati Area 1"
+            ],
+            "Area 2": [
+                "53200 - Area 2",
+                "53201 - Site Pelabuhan Bengkulu",
+                "53202 - Site Pelabuhan Cirebon",
+                "53203 - Site Pelabuhan Jakarta 1",
+                "53204 - Site Pelabuhan Banten",
+                "53205 - Site Pelabuhan Panjang",
+                "53206 - Site Pelabuhan Pontianak",
+                "53207 - Site Pelabuhan Teluk Bayur",
+                "53208 - Site Pelabuhan Palembang",
+                "53209 - Site Pelabuhan Jambi",
+                "53210 - Site Pelabuhan Pangkal Balam",
+                "53211 - Site Pelabuhan Kijing",
+                "53212 - Site Pelabuhan Jakarta 2",
+                "53213 - Site Pelabuhan Jakarta 5",
+                "53214 - Site Pelabuhan Aceh",
+                "53215 - Task Force Area 2",
+                "53216 - Cabang Jakarta Area IKT, GS, dan PTP Tg Priok",
+                "53217 - Cabang Jakarta Area MTI",
+                "53218 - Cabang Jakarta Area TPK 009",
+                "53219 - Cabang Jakarta Area JICT"
+            ],
+            "Area 3": [
+                "53300 - Area 3",
+                "53301 - BIMA Site PMS",
+                "53302 - BIMA Site Perak",
+                "53304 - BIMA Site Gresik",
+                "53305 - BIMA Site Berlian",
+                "53306 - BIMA Site Lamong",
+                "53307 - BIMA Site TPKS",
+                "53308 - BIMA Site Tanjung Emas",
+                "53309 - BIMA Site Tanjung Intan",
+                "53310 - BIMA Site Banjarmasin",
+                "53311 - BIMA Site Batulicin",
+                "53312 - BIMA Site Bagendang",
+                "53313 - BIMA Site Bumiharjo",
+                "53314 - BIMA Site Benoa",
+                "53315 - BIMA Site Lembar",
+                "53316 - BIMA Site Maumere",
+                "53317 - BIMA Site Kupang",
+                "53318 - BIMA Site Bima",
+                "53319 - BIMA Site Celukan Bawang",
+                "53320 - BIMA Site TPS",
+                "53321 - BIMA Site Ende",
+                "53322 - BIMA Site Badas",
+                "53323 - BIMA Site BMC",
+                "53324 - BIMA Site Waingapu",
+                "53325 - BIMA Site Labuan Bajo",
+                "53326 - BIMA Site Terminal Telang Baru",
+                "53327 - BIMA Freeport"
+            ],
+            "Area 4": [
+                "53400 - Area 4",
+                "53401 - Site Pelabuhan Makassar",
+                "53402 - Site Pelabuhan Pantoloan",
+                "53403 - Site Pelabuhan Ternate",
+                "53404 - Site Terminal Petikemas Bitung",
+                "53405 - Site Makassar New Port",
+                "53406 - Site Terminal Petikemas Makassar",
+                "53407 - Site Pelabuhan Sorong",
+                "53408 - Site Terminal Petikemas Ambon",
+                "53409 - Site Kaltim Kariangau Terminal",
+                "53410 - Site Terminal Petikemas Jayapura",
+                "53411 - Site Pelabuhan Kendari",
+                "53412 - Site Pelabuhan Merauke",
+                "53413 - Site Pelabuhan Tarakan",
+                "53414 - Site Pelabuhan Gorontalo",
+                "53415 - Site Pelabuhan Manokwari",
+                "53416 - Site Pelabuhan Semayang Balikpapan",
+                "53417 - Site Pelabuhan Bontang",
+                "53418 - Biak Area 4",
+                "53419 - Nunukan Area 4",
+                "53420 - Toli Toli Area 4",
+                "53421 - Fak Fak Area 4"
+            ]
+        };
+
+        const defaultDummyData = [
+            {
+                id: "REQ-2026-001",
+                namaPemohon: "Budi Santoso",
+                tanggal: "2026-03-01",
+                area: "Area 1",
+                site: "5H01 - Site TPK Belawan Domestik",
+                items: [
+                    {
+                        namaBarang: "BEARING BALL 6205-2RS",
+                        merk: "SKF",
+                        partNumber: "6205-2RS-C3",
+                        materialType: "1011 Spare Parts Teknik",
+                        materialGroup: "99-111 Bearing,Roller",
+                        uom: "PC",
+                        kodePlant: "5H01",
+                        profitCenter: "53101 - Site TPK Belawan Domestik",
+                        storageLocation: "0001",
+                        valuationClass: "1103 Suku Cadang Alat Faspel",
+                        tkdn: 42.5,
+                        dokumentasiUrl: "https://drive.google.com/spec-bearing",
+                        dokGambar: ""
+                    }
+                ],
+                status: "APPROVED",
+                approvalL1: { status: "APPROVED", by: "Admin Peralatan Area L1", date: "2026-03-01 10:15", notes: "Setuju, kebutuhan perbaikan rutin" },
+                approvalL2: { status: "APPROVED", by: "Manper Area L2", date: "2026-03-01 11:00", notes: "Master data terverifikasi SAP" }
+            },
+            {
+                id: "REQ-2026-002",
+                namaPemohon: "Siti Rahmawati",
+                tanggal: "2026-03-05",
+                area: "Area 2",
+                site: "5I03 - Site Pelabuhan Jakarta 1",
+                items: [
+                    {
+                        namaBarang: "CIRCUIT BREAKER 3P 63A",
+                        merk: "Schneider",
+                        partNumber: "NSX630N",
+                        materialType: "1019 Sparepart Electrical",
+                        materialGroup: "99-128 MCB,Fuse,Protect Dev",
+                        uom: "EA",
+                        kodePlant: "5I03",
+                        profitCenter: "53203 - Site Pelabuhan Jakarta 1",
+                        storageLocation: "0001",
+                        valuationClass: "1102 Suku Cadang Inst. Faspel",
+                        tkdn: 35.0,
+                        dokumentasiUrl: "",
+                        dokGambar: ""
+                    }
+                ],
+                status: "PENDING_L2",
+                approvalL1: { status: "APPROVED", by: "Admin Peralatan Area L1", date: "2026-03-05 09:30", notes: "Sesuai WO maintenance panel" },
+                approvalL2: { status: "PENDING", by: "-", date: "-", notes: "" }
+            },
+            {
+                id: "REQ-2026-003",
+                namaPemohon: "Ahmad Fauzi",
+                tanggal: "2026-03-08",
+                area: "Area 3",
+                site: "5J02 - Site Perak",
+                items: [
+                    {
+                        namaBarang: "OIL FILTER CAT 1R-1808",
+                        merk: "Caterpillar",
+                        partNumber: "1R-1808",
+                        materialType: "1018 Sparepart Mechanical",
+                        materialGroup: "99-141 Oil Filter",
+                        uom: "PC",
+                        kodePlant: "5J02",
+                        profitCenter: "53302 - BIMA Site Perak",
+                        storageLocation: "0001",
+                        valuationClass: "1103 Suku Cadang Alat Faspel",
+                        tkdn: 15.0,
+                        dokumentasiUrl: "",
+                        dokGambar: ""
+                    },
+                    {
+                        namaBarang: "FUEL FILTER CAT 1R-0750",
+                        merk: "Caterpillar",
+                        partNumber: "1R-0750",
+                        materialType: "1018 Sparepart Mechanical",
+                        materialGroup: "99-138 Fuel Filter",
+                        uom: "PC",
+                        kodePlant: "5J02",
+                        profitCenter: "53302 - BIMA Site Perak",
+                        storageLocation: "0001",
+                        valuationClass: "1103 Suku Cadang Alat Faspel",
+                        tkdn: 15.0,
+                        dokumentasiUrl: "",
+                        dokGambar: ""
+                    }
+                ],
+                status: "PENDING_L1",
+                approvalL1: { status: "PENDING", by: "-", date: "-", notes: "" },
+                approvalL2: { status: "PENDING", by: "-", date: "-", notes: "" }
+            }
+        ];
+
+        let requestsData = [];
+        let currentRole = 'approver2';
+        let currentTab = 'dashboard';
+        let approvalFilterMode = 'PENDING';
+        let activeModalRequestId = null;
+        let activeModalItemIndex = 0;
+
+        let formMaterialItems = [];
+        let activeItemIndex = 0;
+
+        let statusChartInstance = null;
+        let plantChartInstance = null;
+        let tkdnChartInstance = null;
+
+        Chart.defaults.font.family = "Inter, sans-serif";
+        Chart.defaults.color = '#64748b';
+        Chart.defaults.animation.duration = 650;
+
+        function showNotification(title, message, isError = false) {
+            const modal = document.getElementById('toastNotificationModal');
+            const titleEl = document.getElementById('toastTitle');
+            const msgEl = document.getElementById('toastMessage');
+            const iconContainer = document.getElementById('toastIconContainer');
+            const icon = document.getElementById('toastIcon');
+
+            titleEl.textContent = title;
+            msgEl.textContent = message;
+
+            if (isError) {
+                iconContainer.className = "w-12 h-12 rounded-full mx-auto flex items-center justify-center text-xl bg-red-50 text-red-600";
+                icon.className = "fa-solid fa-circle-exclamation";
+            } else {
+                iconContainer.className = "w-12 h-12 rounded-full mx-auto flex items-center justify-center text-xl bg-emerald-50 text-emerald-600";
+                icon.className = "fa-solid fa-circle-check";
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function createEmptyMaterialItem() {
+            return {
+                namaBarang: '',
+                merk: '',
+                partNumber: '',
+                materialType: '',
+                materialGroup: '',
+                uom: '',
+                profitCenter: '',
+                storageLocation: '0001',
+                valuationClass: '',
+                tkdn: '',
+                dokumentasiUrl: '',
+                dokGambar: ''
+            };
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('tanggal').value = today;
+
+            formMaterialItems = [createEmptyMaterialItem()];
+            activeItemIndex = 0;
+            renderMaterialItemTabs();
+
+            loadData();
+
+            const savedUrl = localStorage.getItem('mmra_gsheet_url') || '';
+            document.getElementById('gsheetUrlInput').value = savedUrl;
+        });
+
+        function renderMaterialItemTabs() {
+            const tabsNav = document.getElementById('materialTabsNav');
+            if (!tabsNav) return;
+            tabsNav.innerHTML = '';
+
+            formMaterialItems.forEach((item, index) => {
+                const isActive = index === activeItemIndex;
+                const tabBtn = document.createElement('div');
+                tabBtn.className = `flex items-center space-x-2 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                    isActive ? 'bg-pelindo-blue text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                }`;
+
+                const itemLabel = item.namaBarang ? (item.namaBarang.length > 15 ? item.namaBarang.substring(0, 15) + '...' : item.namaBarang) : `Item #${index + 1}`;
+
+                let removeBtnHtml = '';
+                if (formMaterialItems.length > 1) {
+                    removeBtnHtml = `
+                        <button type="button" onclick="removeMaterialItemTab(event, ${index})" class="ml-1 text-[11px] ${isActive ? 'text-white/80 hover:text-white' : 'text-red-400 hover:text-red-600'}" title="Hapus Item">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    `;
+                }
+
+                tabBtn.innerHTML = `
+                    <span onclick="switchMaterialItemTab(${index})"><i class="fa-solid fa-box text-[10px] mr-1"></i>${index + 1}. ${itemLabel}</span>
+                    ${removeBtnHtml}
+                `;
+                tabsNav.appendChild(tabBtn);
+            });
+
+            document.getElementById('activeItemLabel').textContent = `Item #${activeItemIndex + 1}`;
+            document.getElementById('totalItemsSubmitBadge').textContent = `${formMaterialItems.length} Item`;
+        }
+
+        function addMaterialItemTab() {
+            formMaterialItems.push(createEmptyMaterialItem());
+            activeItemIndex = formMaterialItems.length - 1;
+            renderMaterialItemTabs();
+            loadActiveItemToForm();
+        }
+
+        function removeMaterialItemTab(e, index) {
+            e.stopPropagation();
+            if (formMaterialItems.length <= 1) return;
+
+            formMaterialItems.splice(index, 1);
+            if (activeItemIndex >= formMaterialItems.length) {
+                activeItemIndex = formMaterialItems.length - 1;
+            }
+            renderMaterialItemTabs();
+            loadActiveItemToForm();
+        }
+
+        function switchMaterialItemTab(index) {
+            activeItemIndex = index;
+            renderMaterialItemTabs();
+            loadActiveItemToForm();
+        }
+
+        function syncActiveItemField(field, val) {
+            if (!formMaterialItems[activeItemIndex]) return;
+            formMaterialItems[activeItemIndex][field] = val;
+            renderMaterialItemTabs();
+        }
+
+        function loadActiveItemToForm() {
+            const item = formMaterialItems[activeItemIndex] || createEmptyMaterialItem();
+
+            document.getElementById('namaBarang').value = item.namaBarang || '';
+            document.getElementById('merk').value = item.merk || '';
+            document.getElementById('partNumber').value = item.partNumber || '';
+            document.getElementById('materialType').value = item.materialType || '';
+            document.getElementById('materialGroup').value = item.materialGroup || '';
+            document.getElementById('uom').value = item.uom || '';
+            document.getElementById('profitCenter').value = item.profitCenter || '';
+            document.getElementById('storageLocation').value = item.storageLocation || '0001';
+            document.getElementById('valuationClass').value = item.valuationClass || '';
+            document.getElementById('tkdn').value = item.tkdn || '';
+            document.getElementById('dokumentasiUrl').value = item.dokumentasiUrl || '';
+
+            if (item.dokGambar) {
+                document.getElementById('imagePreview').src = item.dokGambar;
+                document.getElementById('imagePreviewContainer').classList.remove('hidden');
+            } else {
+                document.getElementById('imagePreview').src = '';
+                document.getElementById('imagePreviewContainer').classList.add('hidden');
+            }
+            document.getElementById('dokGambarInput').value = '';
+        }
+
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const base64 = evt.target.result;
+                formMaterialItems[activeItemIndex].dokGambar = base64;
+                document.getElementById('imagePreview').src = base64;
+                document.getElementById('imagePreviewContainer').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeUploadedImage() {
+            if (formMaterialItems[activeItemIndex]) {
+                formMaterialItems[activeItemIndex].dokGambar = '';
+            }
+            document.getElementById('dokGambarInput').value = "";
+            document.getElementById('imagePreview').src = "";
+            document.getElementById('imagePreviewContainer').classList.add('hidden');
+        }
+
+        function normalizeRecordItems(req) {
+            if (req.items && Array.isArray(req.items) && req.items.length > 0) {
+                return req.items;
+            }
+            return [{
+                namaBarang: req.namaBarang || '-',
+                merk: req.merk || '-',
+                partNumber: req.partNumber || '-',
+                materialType: req.materialType || '-',
+                materialGroup: req.materialGroup || '-',
+                uom: req.uom || 'EA',
+                kodePlant: req.kodePlant || '-',
+                profitCenter: req.profitCenter || '-',
+                storageLocation: req.storageLocation || '0001',
+                valuationClass: req.valuationClass || '-',
+                tkdn: req.tkdn || 0,
+                dokumentasiUrl: req.dokumentasiUrl || '',
+                dokGambar: req.dokGambar || ''
+            }];
+        }
+
+        function loadData() {
+            const local = localStorage.getItem('mmra_requests');
+            if (local) {
+                try {
+                    requestsData = JSON.parse(local);
+                } catch (e) {
+                    requestsData = [...defaultDummyData];
+                }
+            } else {
+                requestsData = [...defaultDummyData];
+                saveData();
+            }
+
+            requestsData.forEach(r => {
+                r.items = normalizeRecordItems(r);
+                r.approvalL3 = r.approvalL3 || { status: "PENDING", by: "-", date: "-", notes: "" };
+                r.approvalL4 = r.approvalL4 || { status: "PENDING", by: "-", date: "-", notes: "" };
+            });
+
+            renderAll();
+        }
+
+        function saveData() {
+            localStorage.setItem('mmra_requests', JSON.stringify(requestsData));
+            renderAll();
+        }
+
+        function handleAreaChange(areaVal) {
+            const siteSelect = document.getElementById('site');
+            const profitSelect = document.getElementById('profitCenter');
+
+            siteSelect.innerHTML = '<option value="" disabled selected>-- Pilih Site --</option>';
+            profitSelect.innerHTML = '<option value="" disabled selected>-- Pilih Profit Center --</option>';
+            document.getElementById('kodePlant').value = '';
+
+            if (sitesByArea[areaVal]) {
+                sitesByArea[areaVal].forEach(site => {
+                    const opt = document.createElement('option');
+                    opt.value = site;
+                    opt.textContent = site;
+                    siteSelect.appendChild(opt);
+                });
+            }
+
+            if (profitCentersByArea[areaVal]) {
+                profitCentersByArea[areaVal].forEach(pc => {
+                    const opt = document.createElement('option');
+                    opt.value = pc;
+                    opt.textContent = pc;
+                    profitSelect.appendChild(opt);
+                });
+            }
+        }
+
+        function handleSiteChange(siteVal) {
+            if (siteVal && siteVal.length >= 4) {
+                const plantCode = siteVal.substring(0, 4);
+                document.getElementById('kodePlant').value = plantCode;
+            } else {
+                document.getElementById('kodePlant').value = '';
+            }
+        }
+
+        function switchTab(tabName) {
+            currentTab = tabName;
+            ['dashboard', 'permohonan', 'approval'].forEach(t => {
+                const btn = document.getElementById('tabBtn' + capitalize(t));
+                const content = document.getElementById('tabContent' + capitalize(t));
+                if (t === tabName) {
+                    btn?.classList.add('active');
+                    content?.classList.remove('hidden');
+                } else {
+                    btn?.classList.remove('active');
+                    content?.classList.add('hidden');
+                }
+            });
+            renderAll();
+        }
+
+        function capitalize(s) {
+            return s.charAt(0).toUpperCase() + s.slice(1);
+        }
+
+        function changeRole(roleVal) {
+            currentRole = roleVal;
+            const titleEl = document.getElementById('approvalRoleTitle');
+            const descEl = document.getElementById('approvalRoleDesc');
+
+            if (roleVal === 'pemohon') {
+                switchTab('permohonan');
+                if (titleEl) titleEl.textContent = "Modul Pemohon (View Only Approval)";
+                if (descEl) descEl.textContent = "Memantau progres persetujuan permohonan material Anda";
+            } else if (roleVal === 'approver1') {
+                switchTab('approval');
+                if (titleEl) titleEl.textContent = "Modul Approval Admin Peralatan Area (L1)";
+                if (descEl) descEl.textContent = "Menampilkan permohonan baru yang membutuhkan persetujuan Admin Peralatan Area (L1)";
+            } else if (roleVal === 'approver2') {
+                switchTab('approval');
+                if (titleEl) titleEl.textContent = "Modul Approval Manper Area (L2)";
+                if (descEl) descEl.textContent = "Menampilkan permohonan yang telah disetujui L1 untuk verifikasi Manper Area (L2)";
+            } else if (roleVal === 'approver3') {
+                switchTab('approval');
+                if (titleEl) titleEl.textContent = "Modul Approval Manager Akuntansi (L3)";
+                if (descEl) descEl.textContent = "Menampilkan permohonan yang telah disetujui L2 untuk verifikasi Manager Akuntansi (L3)";
+            } else if (roleVal === 'approver4') {
+                switchTab('approval');
+                if (titleEl) titleEl.textContent = "Modul Approval Manager Persediaan (L4)";
+                if (descEl) descEl.textContent = "Menampilkan permohonan yang telah disetujui L3 untuk verifikasi akhir Manager Persediaan (L4)";
+            }
+
+            renderAll();
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const plantCode = document.getElementById('kodePlant').value;
+
+            for (let i = 0; i < formMaterialItems.length; i++) {
+                const item = formMaterialItems[i];
+                if (!item.namaBarang || !item.merk || !item.partNumber || !item.materialType || !item.materialGroup || !item.uom || !item.profitCenter || !item.valuationClass) {
+                    activeItemIndex = i;
+                    renderMaterialItemTabs();
+                    loadActiveItemToForm();
+                    showNotification("Form Belum Lengkap", `Mohon lengkapi atribut wajib pada Item #${i + 1} (${item.namaBarang || 'Tanpa Nama'})!`, true);
+                    return;
+                }
+                item.kodePlant = plantCode;
+            }
+
+            const newId = "REQ-" + new Date().getFullYear() + "-" + String(requestsData.length + 1).padStart(3, '0');
+
+            const newReq = {
+                id: newId,
+                namaPemohon: document.getElementById('namaPemohon').value.trim(),
+                tanggal: document.getElementById('tanggal').value,
+                area: document.getElementById('area').value,
+                site: document.getElementById('site').value,
+                items: JSON.parse(JSON.stringify(formMaterialItems)),
+                status: "PENDING_L1",
+                approvalL1: { status: "PENDING", by: "-", date: "-", notes: "" },
+                approvalL2: { status: "PENDING", by: "-", date: "-", notes: "" },
+                approvalL3: { status: "PENDING", by: "-", date: "-", notes: "" },
+                approvalL4: { status: "PENDING", by: "-", date: "-", notes: "" }
+            };
+
+            requestsData.unshift(newReq);
+            saveData();
+            resetForm();
+            showNotification("Berhasil Terkirim", `Permintaan Master Material dengan ID ${newId} (${newReq.items.length} Item) berhasil diajukan!`);
+            switchTab('permohonan');
+        }
+
+        function resetForm() {
+            document.getElementById('materialForm').reset();
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('tanggal').value = today;
+            document.getElementById('kodePlant').value = '';
+            document.getElementById('site').innerHTML = '<option value="" disabled selected>-- Pilih Area terlebih dahulu --</option>';
+            document.getElementById('profitCenter').innerHTML = '<option value="" disabled selected>-- Pilih Area terlebih dahulu --</option>';
+
+            formMaterialItems = [createEmptyMaterialItem()];
+            activeItemIndex = 0;
+            renderMaterialItemTabs();
+            loadActiveItemToForm();
+        }
+
+        function setApprovalFilter(mode) {
+            approvalFilterMode = mode;
+            const btnPending = document.getElementById('filterPendingBtn');
+            const btnHistory = document.getElementById('filterHistoryBtn');
+
+            if (mode === 'PENDING') {
+                btnPending.className = "px-3 py-1.5 rounded-lg font-bold bg-white text-pelindo-blue shadow";
+                btnHistory.className = "px-3 py-1.5 rounded-lg font-bold text-white hover:bg-white/10";
+            } else {
+                btnHistory.className = "px-3 py-1.5 rounded-lg font-bold bg-white text-pelindo-blue shadow";
+                btnPending.className = "px-3 py-1.5 rounded-lg font-bold text-white hover:bg-white/10";
+            }
+            renderApprovalTable();
+        }
+
+        function openApprovalModal(id, itemIndex = 0) {
+            activeModalRequestId = id;
+            activeModalItemIndex = itemIndex;
+            const req = requestsData.find(r => r.id === id);
+            if (!req) return;
+
+            const items = normalizeRecordItems(req);
+            const selectedItem = items[itemIndex] || items[0] || {};
+            const compactMaterialPart = value => String(value || '-').replace(/\s+/g, '');
+            const plantText = req.site || '-';
+            const itemText = [selectedItem.merk, selectedItem.namaBarang, selectedItem.partNumber]
+                .map(compactMaterialPart)
+                .join(':');
+            const isL1 = currentRole === 'approver1';
+
+            document.getElementById('approveModalReqId').textContent = req.id;
+            document.getElementById('approveModalPlant').textContent = plantText;
+            document.getElementById('approveModalItem').textContent = itemText;
+            document.getElementById('approvalModalTitle').textContent = isL1 ? 'Proses Review Approval L1' : 'Verifikasi Approval Permintaan';
+            document.getElementById('approvalMaterialCharacterCount').value = itemText.length;
+            document.getElementById('approvalRecommendedName').value = (selectedItem.rekomendasiNamaMaterial || '').slice(0, 40);
+            updateRecommendedNameCount();
+            document.getElementById('approvalNotes').value = "";
+            document.getElementById('approvalL1ManualFields').classList.toggle('hidden', !isL1);
+            document.getElementById('approvalL1Actions').classList.toggle('hidden', !isL1);
+            document.getElementById('approvalStandardActions').classList.toggle('hidden', isL1);
+            toggleModal('approvalModal');
+        }
+
+        function updateRecommendedNameCount() {
+            const input = document.getElementById('approvalRecommendedName');
+            const counter = document.getElementById('approvalRecommendedNameCount');
+            if (input && counter) counter.textContent = input.value.length;
+        }
+
+        function processApproval(decision) {
+            if (!activeModalRequestId) return;
+
+            const notes = document.getElementById('approvalNotes').value.trim();
+            if (!notes) {
+                showNotification("Catatan Wajib", "Mohon masukkan catatan atau alasan verifikasi!", true);
+                return;
+            }
+
+            const req = requestsData.find(r => r.id === activeModalRequestId);
+            if (!req) return;
+
+            const nowStr = new Date().toLocaleString('id-ID');
+
+            if (currentRole === 'approver1') {
+                const items = normalizeRecordItems(req);
+                const selectedItem = items[activeModalItemIndex] || items[0];
+                const materialCharacterCount = Number(document.getElementById('approvalMaterialCharacterCount').value) || 0;
+                const recommendedName = document.getElementById('approvalRecommendedName').value.trim();
+
+                if (recommendedName.length > 40) {
+                    showNotification("Melebihi Batas Karakter", "Rekomendasi Nama Material tidak boleh lebih dari 40 karakter.", true);
+                    return;
+                }
+
+                if (decision === 'APPROVED' && !recommendedName) {
+                    showNotification("Data Belum Lengkap", "Rekomendasi Nama Material wajib diisi sebelum permintaan disetujui.", true);
+                    return;
+                }
+
+                if (selectedItem) {
+                    selectedItem.jumlahKarakterMaterial = materialCharacterCount;
+                    selectedItem.rekomendasiNamaMaterial = recommendedName;
+                }
+
+                if (decision === 'APPROVED') {
+                    req.status = 'PENDING_L2';
+                    req.approvalL1 = { status: 'APPROVED', by: 'Admin Peralatan Area L1', date: nowStr, notes: notes, jumlahKarakterMaterial: materialCharacterCount, rekomendasiNamaMaterial: recommendedName };
+                } else {
+                    req.status = 'REJECTED';
+                    req.approvalL1 = { status: 'REJECTED', by: 'Admin Peralatan Area L1', date: nowStr, notes: notes, jumlahKarakterMaterial: materialCharacterCount, rekomendasiNamaMaterial: recommendedName };
+                }
+            } else if (currentRole === 'approver2') {
+                if (decision === 'APPROVED') {
+                    req.status = 'PENDING_L3';
+                    req.approvalL2 = { status: 'APPROVED', by: 'Manper Area L2', date: nowStr, notes: notes };
+                } else {
+                    req.status = 'REJECTED';
+                    req.approvalL2 = { status: 'REJECTED', by: 'Manper Area L2', date: nowStr, notes: notes };
+                }
+            } else if (currentRole === 'approver3') {
+                if (decision === 'APPROVED') {
+                    req.status = 'PENDING_L4';
+                    req.approvalL3 = { status: 'APPROVED', by: 'Manager Akuntansi L3', date: nowStr, notes: notes };
+                } else {
+                    req.status = 'REJECTED';
+                    req.approvalL3 = { status: 'REJECTED', by: 'Manager Akuntansi L3', date: nowStr, notes: notes };
+                }
+            } else if (currentRole === 'approver4') {
+                if (decision === 'APPROVED') {
+                    req.status = 'APPROVED';
+                    req.approvalL4 = { status: 'APPROVED', by: 'Manager Persediaan L4', date: nowStr, notes: notes };
+                } else {
+                    req.status = 'REJECTED';
+                    req.approvalL4 = { status: 'REJECTED', by: 'Manager Persediaan L4', date: nowStr, notes: notes };
+                }
+            }
+
+            saveData();
+            toggleModal('approvalModal');
+            showNotification("Status Diperbarui", `Approval untuk ID ${req.id} telah berhasil diproses.`);
+        }
+
+        function openDetailModal(id) {
+            const req = requestsData.find(r => r.id === id);
+            if (!req) return;
+
+            document.getElementById('detailReqId').textContent = req.id;
+            const items = normalizeRecordItems(req);
+
+            let itemsHtml = items.map((item, idx) => {
+                let imgHtml = item.dokGambar ? `<img src="${item.dokGambar}" class="w-full max-h-40 object-contain rounded-xl border border-slate-200 bg-slate-50">` : `<p class="text-xs text-slate-400 italic">Tidak ada lampiran gambar</p>`;
+                let urlHtml = item.dokumentasiUrl ? `<a href="${item.dokumentasiUrl}" target="_blank" class="text-xs font-semibold text-pelindo-blue underline break-all"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>Buka Link Dokumen</a>` : `<p class="text-xs text-slate-400 italic">Tidak ada link dokumentasi</p>`;
+
+                return `
+                    <div class="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm space-y-3">
+                        <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                            <span class="text-xs font-bold text-pelindo-blue bg-blue-50 px-2.5 py-0.5 rounded-full">Item #${idx + 1}</span>
+                            <span class="text-xs text-slate-400 font-mono">Plant: ${item.kodePlant || '-'}</span>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                            <div class="col-span-2 sm:col-span-3"><p class="text-slate-400">Nama Barang</p><p class="font-bold text-slate-900 text-sm">${item.namaBarang}</p></div>
+                            <div><p class="text-slate-400">Merk</p><p class="font-bold text-slate-800">${item.merk}</p></div>
+                            <div><p class="text-slate-400">Part Number</p><p class="font-bold text-slate-800">${item.partNumber}</p></div>
+                            <div><p class="text-slate-400">UOM</p><p class="font-bold text-slate-800">${item.uom}</p></div>
+                            <div class="col-span-2"><p class="text-slate-400">Material Type</p><p class="font-bold text-slate-800">${item.materialType}</p></div>
+                            <div><p class="text-slate-400">Material Group</p><p class="font-bold text-slate-800">${item.materialGroup}</p></div>
+                            <div><p class="text-slate-400">Storage Location</p><p class="font-bold text-slate-800">${item.storageLocation}</p></div>
+                            <div class="col-span-2"><p class="text-slate-400">Valuation Class</p><p class="font-bold text-slate-800">${item.valuationClass}</p></div>
+                            <div><p class="text-slate-400">TKDN</p><p class="font-bold text-indigo-600">${item.tkdn}%</p></div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                            <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                                <p class="text-[11px] font-bold text-slate-500 mb-1">Link Dokumentasi</p>
+                                ${urlHtml}
+                            </div>
+                            <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                                <p class="text-[11px] font-bold text-slate-500 mb-1">Gambar Fisik Barang</p>
+                                ${imgHtml}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const contentHtml = `
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div><p class="text-slate-400">Pemohon</p><p class="font-bold text-slate-800">${req.namaPemohon}</p></div>
+                    <div><p class="text-slate-400">Tanggal Pengajuan</p><p class="font-bold text-slate-800">${req.tanggal}</p></div>
+                    <div><p class="text-slate-400">Area</p><p class="font-bold text-slate-800">${req.area}</p></div>
+                    <div class="col-span-2 sm:col-span-3"><p class="text-slate-400">Site Lokasi</p><p class="font-bold text-slate-800">${req.site}</p></div>
+                </div>
+
+                <div class="space-y-3">
+                    <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                        <span>Atribut Material (${items.length} Item)</span>
+                    </h4>
+                    ${itemsHtml}
+                </div>
+
+                <div class="space-y-2 pt-2">
+                    <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Audit Trail Approval</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div class="p-3 rounded-xl border border-slate-200 bg-slate-50">
+                            <p class="font-bold text-slate-700">Approval L1 (Admin Peralatan Area)</p>
+                            <p class="text-slate-500">Status: <span class="font-bold">${req.approvalL1.status}</span></p>
+                            <p class="text-slate-500">Oleh: ${req.approvalL1.by}</p>
+                            <p class="text-slate-500">Tanggal: ${req.approvalL1.date}</p>
+                            <p class="text-slate-600 italic mt-1 font-semibold">"${req.approvalL1.notes || '-'}"</p>
+                        </div>
+                        <div class="p-3 rounded-xl border border-slate-200 bg-slate-50">
+                            <p class="font-bold text-slate-700">Approval L2 (Manper Area)</p>
+                            <p class="text-slate-500">Status: <span class="font-bold">${req.approvalL2.status}</span></p>
+                            <p class="text-slate-500">Oleh: ${req.approvalL2.by}</p>
+                            <p class="text-slate-500">Tanggal: ${req.approvalL2.date}</p>
+                            <p class="text-slate-600 italic mt-1 font-semibold">"${req.approvalL2.notes || '-'}"</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('detailModalContent').innerHTML = contentHtml;
+            toggleModal('detailModal');
+        }
+
+        function toggleModal(modalId) {
+            const el = document.getElementById(modalId);
+            if (el) el.classList.toggle('hidden');
+        }
+
+        function getStatusBadge(status) {
+            switch (status) {
+                case 'APPROVED':
+                    return `<span class="px-2.5 py-1 text-xs font-extrabold bg-emerald-100 text-emerald-700 rounded-full inline-flex items-center"><i class="fa-solid fa-circle-check mr-1"></i>Approved</span>`;
+                case 'REJECTED':
+                    return `<span class="px-2.5 py-1 text-xs font-extrabold bg-red-100 text-red-700 rounded-full inline-flex items-center"><i class="fa-solid fa-circle-xmark mr-1"></i>Rejected</span>`;
+                case 'PENDING_L2':
+                    return `<span class="px-2.5 py-1 text-xs font-extrabold bg-blue-100 text-blue-700 rounded-full inline-flex items-center"><i class="fa-solid fa-clock mr-1"></i>Pending L2</span>`;
+                case 'PENDING_L3':
+                    return `<span class="px-2.5 py-1 text-xs font-extrabold bg-indigo-100 text-indigo-700 rounded-full inline-flex items-center"><i class="fa-solid fa-clock mr-1"></i>Pending L3</span>`;
+                case 'PENDING_L4':
+                    return `<span class="px-2.5 py-1 text-xs font-extrabold bg-purple-100 text-purple-700 rounded-full inline-flex items-center"><i class="fa-solid fa-clock mr-1"></i>Pending L4</span>`;
+                case 'REVISION':
+                    return `<span class="px-2.5 py-1 text-xs font-extrabold bg-amber-100 text-amber-700 rounded-full inline-flex items-center"><i class="fa-solid fa-pen-to-square mr-1"></i>Perlu Revisi</span>`;
+                case 'PENDING_L1':
+                default:
+                    return `<span class="px-2.5 py-1 text-xs font-extrabold bg-amber-100 text-amber-700 rounded-full inline-flex items-center"><i class="fa-solid fa-hourglass-half mr-1"></i>Pending L1</span>`;
+            }
+        }
+
+        function renderAll() {
+            renderKPIs();
+            renderDashboardTable();
+            renderPermohonanTable();
+            renderApprovalTable();
+            renderCharts();
+        }
+
+        function renderKPIs() {
+            const total = requestsData.length;
+            const pending = requestsData.filter(r => ['PENDING_L1', 'PENDING_L2', 'PENDING_L3', 'PENDING_L4'].includes(r.status)).length;
+            const approved = requestsData.filter(r => r.status === 'APPROVED').length;
+
+            let tkdnSum = 0;
+            let totalItemsCount = 0;
+
+            requestsData.forEach(r => {
+                const items = normalizeRecordItems(r);
+                items.forEach(it => {
+                    tkdnSum += parseFloat(it.tkdn) || 0;
+                    totalItemsCount++;
+                });
+            });
+
+            const tkdnAvg = totalItemsCount > 0 ? (tkdnSum / totalItemsCount).toFixed(1) : 0;
+
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statPending').textContent = pending;
+            document.getElementById('statApproved').textContent = approved;
+            document.getElementById('statTkdnAvg').textContent = tkdnAvg + '%';
+
+            const badge = document.getElementById('pendingBadge');
+            if (badge) {
+                if (pending > 0) {
+                    badge.textContent = pending;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+        }
+
+        function renderDashboardTable() {
+            const tbody = document.getElementById('dashboardTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = "";
+
+            let itemList = [];
+            requestsData.forEach(r => {
+                const items = normalizeRecordItems(r);
+                items.forEach((item, itemIdx) => {
+                    itemList.push({ req: r, item, itemIdx, totalItems: items.length });
+                });
+            });
+
+            const recentList = itemList.slice(0, 5);
+            if (recentList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-400">Belum ada data permohonan.</td></tr>`;
+                return;
+            }
+
+            recentList.forEach(({ req: r, item, itemIdx, totalItems }) => {
+                const lineBadge = totalItems > 1 ? `<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded ml-1 border border-slate-200">Line ${itemIdx + 1}</span>` : '';
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition";
+                tr.innerHTML = `
+                    <td class="px-4 py-3 font-mono font-bold text-pelindo-blue">${r.id}${lineBadge}</td>
+                    <td class="px-4 py-3 text-slate-500">${r.tanggal}</td>
+                    <td class="px-4 py-3 font-medium text-slate-800">${r.namaPemohon}</td>
+                    <td class="px-4 py-3 text-slate-600">${r.area} - ${r.site.substring(0, 15)}...</td>
+                    <td class="px-4 py-3 font-semibold text-slate-800">${item.namaBarang}</td>
+                    <td class="px-4 py-3 text-slate-600">${(item.materialType || '').substring(0, 20)}</td>
+                    <td class="px-4 py-3 text-center">${getStatusBadge(r.status)}</td>
+                    <td class="px-4 py-3 text-right">
+                        <button onclick="openDetailModal('${r.id}')" class="px-2.5 py-1 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition">Detail</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderPermohonanTable() {
+            const tbody = document.getElementById('permohonanTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = "";
+
+            const searchVal = (document.getElementById('searchInput')?.value || '').toLowerCase();
+
+            let matchedLines = [];
+            requestsData.forEach(r => {
+                const items = normalizeRecordItems(r);
+                items.forEach((item, itemIdx) => {
+                    const lineText = `${r.id} ${r.namaPemohon} ${r.site} ${r.area} ${item.namaBarang} ${item.materialGroup} ${item.materialType} ${item.merk} ${item.partNumber}`.toLowerCase();
+                    if (lineText.includes(searchVal)) {
+                        matchedLines.push({ req: r, item, itemIdx, totalItems: items.length });
+                    }
+                });
+            });
+
+            if (matchedLines.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-400">Data tidak ditemukan.</td></tr>`;
+                return;
+            }
+
+            matchedLines.forEach(({ req: r, item, itemIdx, totalItems }) => {
+                const lineBadge = totalItems > 1 ? `<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded ml-1 border border-slate-200">Line ${itemIdx + 1}</span>` : '';
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition";
+                tr.innerHTML = `
+                    <td class="px-4 py-3 font-mono font-bold text-pelindo-blue">${r.id}${lineBadge}</td>
+                    <td class="px-4 py-3 text-slate-500">${r.tanggal}</td>
+                    <td class="px-4 py-3 font-medium text-slate-800">${r.namaPemohon}</td>
+                    <td class="px-4 py-3 text-slate-600">${r.site}</td>
+                    <td class="px-4 py-3 font-semibold text-slate-800">${item.namaBarang}</td>
+                    <td class="px-4 py-3 text-slate-600">${item.materialGroup || '-'}</td>
+                    <td class="px-4 py-3 font-bold text-indigo-600">${item.tkdn || 0}%</td>
+                    <td class="px-4 py-3 text-center">${getStatusBadge(r.status)}</td>
+                    <td class="px-4 py-3 text-right">
+                        <button onclick="openDetailModal('${r.id}')" class="px-2.5 py-1 text-xs font-bold text-pelindo-blue bg-blue-50 hover:bg-blue-100 rounded-lg transition">Detail</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderApprovalTable() {
+            const tbody = document.getElementById('approvalTableBody');
+            const thead = document.getElementById('approvalTableHead');
+            if (!tbody) return;
+
+            if (thead) {
+                if (currentRole === 'approver1') {
+                    thead.innerHTML = `
+                        <tr>
+                            <th class="px-4 py-3">ID Req</th>
+                            <th class="px-4 py-3">Plant</th>
+                            <th class="px-4 py-3">Brand; Nama Barang; Part Number</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-right">Aksi</th>
+                        </tr>
+                    `;
+                } else if (currentRole === 'approver3') {
+                    thead.innerHTML = `
+                        <tr>
+                            <th class="px-4 py-3">ID Req</th>
+                            <th class="px-4 py-3">Tanggal</th>
+                            <th class="px-4 py-3">Site (Plant)</th>
+                            <th class="px-4 py-3">Nama Barang</th>
+                            <th class="px-4 py-3">Profit Center</th>
+                            <th class="px-4 py-3">Valuation Class</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-right">Aksi</th>
+                        </tr>
+                    `;
+                } else if (currentRole === 'approver4') {
+                    thead.innerHTML = `
+                        <tr>
+                            <th class="px-4 py-3">ID Req</th>
+                            <th class="px-4 py-3">Tanggal</th>
+                            <th class="px-4 py-3">Site (Plant)</th>
+                            <th class="px-4 py-3">Nama Barang</th>
+                            <th class="px-4 py-3">Material Type</th>
+                            <th class="px-4 py-3">Material Group</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-right">Aksi</th>
+                        </tr>
+                    `;
+                } else {
+                    thead.innerHTML = `
+                        <tr>
+                            <th class="px-4 py-3">ID Req</th>
+                            <th class="px-4 py-3">Tanggal</th>
+                            <th class="px-4 py-3">Pemohon</th>
+                            <th class="px-4 py-3">Site (Plant)</th>
+                            <th class="px-4 py-3">Nama Barang</th>
+                            <th class="px-4 py-3">Profit Center</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-right">Aksi</th>
+                        </tr>
+                    `;
+                }
+            }
+
+            tbody.innerHTML = "";
+
+            let matchedLines = [];
+            requestsData.forEach(r => {
+                const isPending = (approvalFilterMode === 'PENDING') ? (
+                    (currentRole === 'approver1' && r.status === 'PENDING_L1') ||
+                    (currentRole === 'approver2' && r.status === 'PENDING_L2') ||
+                    (currentRole === 'approver3' && r.status === 'PENDING_L3') ||
+                    (currentRole === 'approver4' && r.status === 'PENDING_L4') ||
+                    (currentRole === 'pemohon' && ['PENDING_L1', 'PENDING_L2', 'PENDING_L3', 'PENDING_L4'].includes(r.status))
+                ) : true;
+
+                if (isPending) {
+                    const items = normalizeRecordItems(r);
+                    items.forEach((item, itemIdx) => {
+                        matchedLines.push({ req: r, item, itemIdx, totalItems: items.length });
+                    });
+                }
+            });
+
+            if (matchedLines.length === 0) {
+                const colSpanCount = currentRole === 'approver1' ? 5 : 8;
+                tbody.innerHTML = `<tr><td colspan="${colSpanCount}" class="text-center py-8 text-slate-400">Tidak ada antrean approval pada kategori ini.</td></tr>`;
+                return;
+            }
+
+            matchedLines.forEach(({ req: r, item, itemIdx, totalItems }) => {
+                const lineBadge = totalItems > 1 ? `<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded ml-1 border border-slate-200">Line ${itemIdx + 1}</span>` : '';
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition";
+
+                let actionBtn = "";
+                const isNeedReview = (currentRole === 'approver1' && r.status === 'PENDING_L1') ||
+                                    (currentRole === 'approver2' && r.status === 'PENDING_L2') ||
+                                    (currentRole === 'approver3' && r.status === 'PENDING_L3') ||
+                                    (currentRole === 'approver4' && r.status === 'PENDING_L4');
+
+                if (isNeedReview) {
+                    actionBtn = `<button onclick="openApprovalModal('${r.id}', ${itemIdx})" class="px-3 py-1.5 text-xs font-bold text-white bg-pelindo-blue hover:bg-pelindo-darkBlue rounded-xl shadow-sm transition"><i class="fa-solid fa-clipboard-check mr-1"></i>Proses Review</button>`;
+                } else {
+                    actionBtn = `<button onclick="openDetailModal('${r.id}')" class="px-2.5 py-1 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition">Lihat Status</button>`;
+                }
+
+                if (currentRole === 'approver1') {
+                    tr.innerHTML = `
+                        <td class="px-4 py-3 font-mono font-bold text-pelindo-blue">${r.id}${lineBadge}</td>
+                        <td class="px-4 py-3 text-slate-700"><span class="font-mono font-bold text-pelindo-blue">${item.kodePlant || '-'}</span><span class="block text-[11px] text-slate-500 mt-0.5">${r.site}</span></td>
+                        <td class="px-4 py-3 text-slate-700"><span class="font-semibold text-slate-900">${item.merk || '-'}</span>; ${item.namaBarang || '-'}; <span class="font-mono">${item.partNumber || '-'}</span></td>
+                        <td class="px-4 py-3 text-center">${getStatusBadge(r.status)}</td>
+                        <td class="px-4 py-3 text-right">${actionBtn}</td>
+                    `;
+                } else if (currentRole === 'approver3') {
+                    tr.innerHTML = `
+                        <td class="px-4 py-3 font-mono font-bold text-pelindo-blue">${r.id}${lineBadge}</td>
+                        <td class="px-4 py-3 text-slate-500">${r.tanggal}</td>
+                        <td class="px-4 py-3 text-slate-600">${r.site} (${item.kodePlant || '-'})</td>
+                        <td class="px-4 py-3 font-semibold text-slate-800">${item.namaBarang}</td>
+                        <td class="px-4 py-3 text-slate-600">${item.profitCenter || '-'}</td>
+                        <td class="px-4 py-3 text-slate-600">${item.valuationClass || '-'}</td>
+                        <td class="px-4 py-3 text-center">${getStatusBadge(r.status)}</td>
+                        <td class="px-4 py-3 text-right">${actionBtn}</td>
+                    `;
+                } else if (currentRole === 'approver4') {
+                    tr.innerHTML = `
+                        <td class="px-4 py-3 font-mono font-bold text-pelindo-blue">${r.id}${lineBadge}</td>
+                        <td class="px-4 py-3 text-slate-500">${r.tanggal}</td>
+                        <td class="px-4 py-3 text-slate-600">${r.site} (${item.kodePlant || '-'})</td>
+                        <td class="px-4 py-3 font-semibold text-slate-800">${item.namaBarang}</td>
+                        <td class="px-4 py-3 text-slate-600">${item.materialType || '-'}</td>
+                        <td class="px-4 py-3 text-slate-600">${item.materialGroup || '-'}</td>
+                        <td class="px-4 py-3 text-center">${getStatusBadge(r.status)}</td>
+                        <td class="px-4 py-3 text-right">${actionBtn}</td>
+                    `;
+                } else {
+                    tr.innerHTML = `
+                        <td class="px-4 py-3 font-mono font-bold text-pelindo-blue">${r.id}${lineBadge}</td>
+                        <td class="px-4 py-3 text-slate-500">${r.tanggal}</td>
+                        <td class="px-4 py-3 font-medium text-slate-800">${r.namaPemohon}</td>
+                        <td class="px-4 py-3 text-slate-600">${r.site} (${item.kodePlant || '-'})</td>
+                        <td class="px-4 py-3 font-semibold text-slate-800">${item.namaBarang}</td>
+                        <td class="px-4 py-3 text-slate-600">${item.profitCenter || '-'}</td>
+                        <td class="px-4 py-3 text-center">${getStatusBadge(r.status)}</td>
+                        <td class="px-4 py-3 text-right">${actionBtn}</td>
+                    `;
+                }
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderCharts() {
+            const ctxStatus = document.getElementById('statusChart')?.getContext('2d');
+            if (ctxStatus) {
+                const statusCounts = {
+                    'PENDING_L1': requestsData.filter(r => r.status === 'PENDING_L1').length,
+                    'PENDING_L2': requestsData.filter(r => r.status === 'PENDING_L2').length,
+                    'PENDING_L3': requestsData.filter(r => r.status === 'PENDING_L3').length,
+                    'PENDING_L4': requestsData.filter(r => r.status === 'PENDING_L4').length,
+                    'APPROVED': requestsData.filter(r => r.status === 'APPROVED').length,
+                    'REJECTED': requestsData.filter(r => r.status === 'REJECTED').length,
+                    'REVISION': requestsData.filter(r => r.status === 'REVISION').length
+                };
+
+                if (statusChartInstance) statusChartInstance.destroy();
+                statusChartInstance = new Chart(ctxStatus, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Pending L1', 'Pending L2', 'Pending L3', 'Pending L4', 'Approved', 'Rejected', 'Revisi'],
+                        datasets: [{
+                            data: [statusCounts.PENDING_L1, statusCounts.PENDING_L2, statusCounts.PENDING_L3, statusCounts.PENDING_L4, statusCounts.APPROVED, statusCounts.REJECTED, statusCounts.REVISION],
+                            backgroundColor: ['#f59e0b', '#2f80c9', '#6366f1', '#8b5cf6', '#10b981', '#ef5b5b', '#fbbf24'],
+                            borderWidth: 0,
+                            borderRadius: 5,
+                            spacing: 3,
+                            hoverOffset: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '68%',
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    usePointStyle: true,
+                                    pointStyle: 'circle',
+                                    boxWidth: 8,
+                                    boxHeight: 8,
+                                    padding: 16,
+                                    font: { size: 11, weight: '600' }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: '#082f57',
+                                padding: 11,
+                                cornerRadius: 10,
+                                displayColors: true
+                            }
+                        }
+                    }
+                });
+            }
+
+            const ctxPlant = document.getElementById('plantChart')?.getContext('2d');
+            if (ctxPlant) {
+                const areaCounts = { 'Area 1': 0, 'Area 2': 0, 'Area 3': 0, 'Area 4': 0 };
+                requestsData.forEach(r => {
+                    if (areaCounts[r.area] !== undefined) areaCounts[r.area]++;
+                });
+
+                if (plantChartInstance) plantChartInstance.destroy();
+                plantChartInstance = new Chart(ctxPlant, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Area 1', 'Area 2', 'Area 3', 'Area 4'],
+                        datasets: [{
+                            label: 'Jumlah Permintaan',
+                            data: [areaCounts['Area 1'], areaCounts['Area 2'], areaCounts['Area 3'], areaCounts['Area 4']],
+                            backgroundColor: ['#0b75c9', '#2f80c9', '#69a9dc', '#a8cdea'],
+                            borderRadius: 8,
+                            borderSkipped: false,
+                            maxBarThickness: 34
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                border: { display: false },
+                                ticks: { font: { size: 11, weight: '600' } }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                border: { display: false },
+                                grid: { color: '#e8eef5', drawTicks: false },
+                                ticks: { stepSize: 1, padding: 8, font: { size: 11 } }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#082f57',
+                                padding: 11,
+                                cornerRadius: 10,
+                                displayColors: false
+                            }
+                        }
+                    }
+                });
+            }
+
+            const ctxTkdn = document.getElementById('tkdnChart')?.getContext('2d');
+            if (ctxTkdn) {
+                const tkdnRanges = { '< 25%': 0, '25% - 40%': 0, '> 40%': 0 };
+
+                requestsData.forEach(r => {
+                    const items = normalizeRecordItems(r);
+                    items.forEach(it => {
+                        const val = parseFloat(it.tkdn) || 0;
+                        if (val < 25) tkdnRanges['< 25%']++;
+                        else if (val <= 40) tkdnRanges['25% - 40%']++;
+                        else tkdnRanges['> 40%']++;
+                    });
+                });
+
+                if (tkdnChartInstance) tkdnChartInstance.destroy();
+                tkdnChartInstance = new Chart(ctxTkdn, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['< 25%', '25% - 40%', '> 40%'],
+                        datasets: [{
+                            data: [tkdnRanges['< 25%'], tkdnRanges['25% - 40%'], tkdnRanges['> 40%']],
+                            backgroundColor: ['#b7c7d7', '#5b6ee1', '#12ad82'],
+                            borderWidth: 0,
+                            borderRadius: 5,
+                            spacing: 3,
+                            hoverOffset: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '58%',
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    usePointStyle: true,
+                                    pointStyle: 'circle',
+                                    boxWidth: 8,
+                                    boxHeight: 8,
+                                    padding: 16,
+                                    font: { size: 11, weight: '600' }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: '#082f57',
+                                padding: 11,
+                                cornerRadius: 10,
+                                displayColors: true
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function exportToCSV() {
+            if (requestsData.length === 0) {
+                showNotification("Export Gagal", "Tidak ada data untuk diexport!", true);
+                return;
+            }
+
+            const headers = ["ID Req", "Tanggal", "Pemohon", "Area", "Site", "Nama Barang", "Merk", "Part Number", "Material Type", "Material Group", "UOM", "Kode Plant", "Profit Center", "Storage Location", "Valuation Class", "TKDN %", "Status"];
+            const rows = [];
+
+            requestsData.forEach(r => {
+                const items = normalizeRecordItems(r);
+                items.forEach(it => {
+                    rows.push([
+                        `"${r.id}"`,
+                        `"${r.tanggal}"`,
+                        `"${r.namaPemohon}"`,
+                        `"${r.area}"`,
+                        `"${r.site}"`,
+                        `"${it.namaBarang}"`,
+                        `"${it.merk}"`,
+                        `"${it.partNumber}"`,
+                        `"${it.materialType}"`,
+                        `"${it.materialGroup}"`,
+                        `"${it.uom}"`,
+                        `"${it.kodePlant}"`,
+                        `"${it.profitCenter}"`,
+                        `"${it.storageLocation}"`,
+                        `"${it.valuationClass}"`,
+                        `"${it.tkdn}"`,
+                        `"${r.status}"`
+                    ]);
+                });
+            });
+
+            const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+            const encodedUri = encodeURI(encodeURI ? csvContent : csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Master_Material_Requests_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function saveGSheetUrl() {
+            const url = document.getElementById('gsheetUrlInput').value.trim();
+            localStorage.setItem('mmra_gsheet_url', url);
+            toggleModal('gsheetModal');
+            showNotification("Konfigurasi Disimpan", url ? "URL Google Sheets berhasil disimpan!" : "Mode penyimpanan lokal (LocalStorage) diaktifkan.");
+        }
+    </script>
+</body>
+</html>
